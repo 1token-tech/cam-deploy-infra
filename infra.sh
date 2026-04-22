@@ -41,9 +41,6 @@ cat <<'EOF' | sudo tee /etc/docker/daemon.json >/dev/null
     "max-size": "500m",
     "max-file": "5",
     "compress": "true"
-  },
-  "features": {
-    "containerd-snapshotter": true
   }
 }
 EOF
@@ -51,7 +48,6 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now docker
 sudo systemctl restart docker
-docker version
 
 echo 'mark docker service not auto-upgrade'
 sudo apt-mark hold docker.io
