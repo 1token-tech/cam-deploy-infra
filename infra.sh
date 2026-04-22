@@ -1,7 +1,12 @@
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt autoremove -y
-sudo apt install docker.io pass gnupg2 docker-compose tmux python3 python3-pip -y
+
+# Pin Docker to a known-good Ubuntu 24.04 build for CAM deploy/upgrade compatibility.
+DOCKER_PKG_VERSION="27.5.1-0ubuntu3~24.04.2"
+sudo apt install -y --allow-downgrades \
+  "docker.io=${DOCKER_PKG_VERSION}" \
+  pass gnupg2 docker-compose tmux python3 python3-pip
 
 # update memory dirty page bytes, avoid dirty page write back storm
 sudo tee /etc/sysctl.d/99-oom-tuning.conf >/dev/null <<'EOF'
@@ -28,7 +33,25 @@ if [ ! -f /etc/chrony/chrony.conf ]; then
     chronyc tracking
 fi
 
-# change docker log size
-echo '{"log-opts":{"max-size":"500m","max-file":"5","compress":"true"}}' |sudo tee  /etc/docker/daemon.json
+# configure docker daemon
+sudo mkdir -p /etc/docker
+cat <<'EOF' | sudo tee /etc/docker/daemon.json >/dev/null
+{
+  "log-opts": {
+    "max-size": "500m",
+    "max-file": "5",
+    "compress": "true"
+  },
+  "features": {
+    "containerd-snapshotter": true
+  }
+}
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now docker
+sudo systemctl restart docker
+docker version
+
 echo 'mark docker service not auto-upgrade'
 sudo apt-mark hold docker.io
