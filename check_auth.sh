@@ -17,7 +17,7 @@ echo "------------------------------------------------"
 
 # 2. Check public IP information
 echo "[2] Public IP Information"
-curl -s ipinfo.io
+curl -fsS --connect-timeout 3 --max-time 5 ipinfo.io 2>/dev/null || echo "public ip lookup unavailable (blocked/timeout)"
 echo ""
 echo "------------------------------------------------"
 

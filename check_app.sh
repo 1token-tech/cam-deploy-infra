@@ -110,7 +110,7 @@ get_disk_info() {
 
 print_public_ip_info() {
   if command_exists curl; then
-    curl -fsS --max-time 5 ipinfo.io 2>/dev/null || echo "public ip lookup unavailable"
+    curl -fsS --connect-timeout 3 --max-time 5 ipinfo.io 2>/dev/null || echo "public ip lookup unavailable (blocked/timeout)"
     return
   fi
 
