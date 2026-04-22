@@ -41,9 +41,6 @@ cat <<'EOF' | sudo tee /etc/docker/daemon.json >/dev/null
     "max-size": "500m",
     "max-file": "5",
     "compress": "true"
-  },
-  "features": {
-    "containerd-snapshotter": true
   }
 }
 EOF
