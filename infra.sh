@@ -51,7 +51,6 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now docker
 sudo systemctl restart docker
-docker version
 
 echo 'mark docker service not auto-upgrade'
 sudo apt-mark hold docker.io
