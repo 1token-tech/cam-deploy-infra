@@ -117,6 +117,29 @@ print_public_ip_info() {
   echo "curl command not available"
 }
 
+find_docker_daemon_conf() {
+  local conf
+  for conf in /etc/docker/daemon.json; do
+    if [[ -r "$conf" ]]; then
+      echo "$conf"
+      return 0
+    fi
+  done
+  return 1
+}
+
+extract_docker_log_opt() {
+  local file="$1"
+  local key="$2"
+
+  if command_exists jq; then
+    jq -r --arg k "$key" '."log-opts"[$k] // empty' "$file" 2>/dev/null || true
+    return
+  fi
+
+  sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$file" 2>/dev/null | head -n 1
+}
+
 extract_pg_summary() {
   local file="$1"
 
@@ -197,7 +220,42 @@ else
 fi
 log ""
 
-section "[4] PostgreSQL Usage"
+section "[4] Docker Daemon Log Limit Check"
+if command_exists docker; then
+  docker_logging_driver="$(docker info 2>/dev/null | awk -F': ' '/Logging Driver/ {print $2; exit}' || true)"
+  if [[ -n "${docker_logging_driver:-}" ]]; then
+    log "Logging Driver: $docker_logging_driver"
+  else
+    log "Logging Driver: unknown"
+  fi
+else
+  log "docker command is not available"
+fi
+
+docker_daemon_conf="$(find_docker_daemon_conf 2>/dev/null || true)"
+if [[ -n "${docker_daemon_conf:-}" ]]; then
+  max_size="$(extract_docker_log_opt "$docker_daemon_conf" "max-size")"
+  max_file="$(extract_docker_log_opt "$docker_daemon_conf" "max-file")"
+  compress="$(extract_docker_log_opt "$docker_daemon_conf" "compress")"
+  log "Docker daemon config: $docker_daemon_conf"
+  log "log-opts.max-size: ${max_size:-not set}"
+  log "log-opts.max-file: ${max_file:-not set}"
+  log "log-opts.compress: ${compress:-not set}"
+  if [[ -n "${max_size:-}" && -n "${max_file:-}" ]]; then
+    log "Log rotation: configured"
+  else
+    log "Log rotation: not configured"
+  fi
+else
+  if [[ -f /etc/docker/daemon.json ]]; then
+    log "Docker daemon config: /etc/docker/daemon.json (not readable)"
+  else
+    log "Docker daemon config: /etc/docker/daemon.json (not found)"
+  fi
+fi
+log ""
+
+section "[5] PostgreSQL Usage"
 if [[ -f "$CONFIG_FILE" ]]; then
   pg_summary="$(extract_pg_summary "$CONFIG_FILE")"
   if [[ -n "${pg_summary:-}" ]]; then
@@ -217,7 +275,7 @@ else
 fi
 log ""
 
-section "[5] Redis Usage"
+section "[6] Redis Usage"
 if [[ -f "$CONFIG_FILE" ]]; then
   redis_found=0
   while IFS='|' read -r redis_name redis_host redis_port redis_db; do
@@ -239,7 +297,7 @@ else
 fi
 log ""
 
-section "[6] Summary"
+section "[7] Summary"
 if [[ -f "$CONFIG_FILE" ]]; then
   log "Config source: $CONFIG_FILE"
 else
