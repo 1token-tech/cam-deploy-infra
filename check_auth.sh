@@ -17,7 +17,7 @@ echo "------------------------------------------------"
 
 # 2. Check public IP information
 echo "[2] Public IP Information"
-curl -s ipinfo.io
+curl -fsS --connect-timeout 3 --max-time 5 ipinfo.io 2>/dev/null || echo "public ip lookup unavailable (blocked/timeout)"
 echo ""
 echo "------------------------------------------------"
 
@@ -42,8 +42,28 @@ echo "[6] Docker camauth Container Status"
 docker ps -f name=camauth 2>/dev/null || echo "WARNING: Docker not running or no camauth container"
 echo "------------------------------------------------"
 
-# 7. Validate CAM-AUTH SSH Key
-echo "[7] CAM-AUTH SSH Key Validation"
+# 7. Check Docker daemon log rotation configuration
+echo "[7] Docker Daemon Log Limit Check"
+DOCKER_CONF="/etc/docker/daemon.json"
+
+if [ ! -f "$DOCKER_CONF" ]; then
+    echo "ERROR: Docker daemon config file $DOCKER_CONF not found"
+else
+    echo "INFO: Found Docker config: $DOCKER_CONF"
+    jq . "$DOCKER_CONF" 2>/dev/null || cat "$DOCKER_CONF"
+    
+    # Check log size limit
+    grep -q "max-size" "$DOCKER_CONF" && grep -q "max-file" "$DOCKER_CONF"
+    if [ $? -eq 0 ]; then
+        echo -e "\nSUCCESS: Container log rotation is configured (max-size + max-file)"
+    else
+        echo -e "\nWARNING: No global log size limit configured in Docker daemon"
+    fi
+fi
+echo "------------------------------------------------"
+
+# 8. Validate CAM-AUTH SSH Key
+echo "[8] CAM-AUTH SSH Key Validation"
 SSH_KEY_FILE=~/.camauth/id_rsa
 SSH_PASS_FILE=~/.camauth/id_rsa_pass
 
