@@ -53,8 +53,7 @@ else
     jq . "$DOCKER_CONF" 2>/dev/null || cat "$DOCKER_CONF"
     
     # Check log size limit
-    grep -q "max-size" "$DOCKER_CONF" && grep -q "max-file" "$DOCKER_CONF"
-    if [ $? -eq 0 ]; then
+    if grep -q "max-size" "$DOCKER_CONF" && grep -q "max-file" "$DOCKER_CONF"; then
         echo -e "\nSUCCESS: Container log rotation is configured (max-size + max-file)"
     else
         echo -e "\nWARNING: No global log size limit configured in Docker daemon"
@@ -77,13 +76,12 @@ else
         SSH_PASS=$(cat "$SSH_PASS_FILE" 2>/dev/null)
     else
         echo "INFO: Password file not found, please enter password manually"
-        read -s -p "Enter CAM-AUTH SSH key passphrase: " SSH_PASS
+        read -r -s -p "Enter CAM-AUTH SSH key passphrase: " SSH_PASS
         echo ""
     fi
 
     # Verify SSH key passphrase
-    ssh-keygen -y -f "$SSH_KEY_FILE" -P "$SSH_PASS" >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if ssh-keygen -y -f "$SSH_KEY_FILE" -P "$SSH_PASS" >/dev/null 2>&1; then
         echo "SUCCESS: CAM-AUTH SSH key validated"
     else
         echo "ERROR: Invalid passphrase for CAM-AUTH SSH key"
