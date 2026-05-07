@@ -1,35 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+DOCKER_VERSION_STRING="5:27.5.1-1~ubuntu.24.04~noble"
+
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt autoremove -y
 
-# Pin Docker to a known-good Ubuntu 24.04 build for CAM deploy/upgrade compatibility.
-# Use Ubuntu snapshot service so the exact version remains installable after the
-# regular apt indexes move on to newer builds.
-ARCH="$(dpkg --print-architecture)"
-case "${ARCH}" in
-  amd64)
-    DOCKER_PKG_VERSION="27.5.1-0ubuntu3~24.04.2"
-    DOCKER_SNAPSHOT_ID="20250801T111111Z"
-    ;;
-  arm64)
-    DOCKER_PKG_VERSION="24.0.7-0ubuntu4"
-    DOCKER_SNAPSHOT_ID="20240501T120000Z"
-    ;;
-  *)
-    echo "unsupported architecture for pinned docker.io: ${ARCH}" >&2
-    exit 1
-    ;;
-esac
+OLD_DOCKER_PKGS="$(dpkg --get-selections \
+  docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null \
+  | awk '{print $1}')"
+if [ -n "${OLD_DOCKER_PKGS}" ]; then
+  sudo apt remove -y ${OLD_DOCKER_PKGS}
+fi
 
-echo "install docker.io=${DOCKER_PKG_VERSION} for ${ARCH} from snapshot ${DOCKER_SNAPSHOT_ID}"
-sudo apt install -y --allow-downgrades \
-  --update \
-  --snapshot "${DOCKER_SNAPSHOT_ID}" \
-  "docker.io=${DOCKER_PKG_VERSION}" \
-  pass gnupg2 docker-compose tmux python3 python3-pip
+sudo apt install -y ca-certificates curl pass gnupg2 tmux python3 python3-pip
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update -y
+
+echo "install docker-ce=${DOCKER_VERSION_STRING}"
+sudo apt install -y \
+  "docker-ce=${DOCKER_VERSION_STRING}" \
+  "docker-ce-cli=${DOCKER_VERSION_STRING}" \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
+# Keep legacy docker-compose command working for existing camdeploy scripts.
+sudo tee /usr/local/bin/docker-compose >/dev/null <<'EOF'
+#!/usr/bin/env bash
+exec docker compose "$@"
+EOF
+sudo chmod +x /usr/local/bin/docker-compose
 
 # update memory dirty page bytes, avoid dirty page write back storm
 sudo tee /etc/sysctl.d/99-oom-tuning.conf >/dev/null <<'EOF'
@@ -73,4 +88,4 @@ sudo systemctl enable --now docker
 sudo systemctl restart docker
 
 echo 'mark docker service not auto-upgrade'
-sudo apt-mark hold docker.io
+sudo apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
