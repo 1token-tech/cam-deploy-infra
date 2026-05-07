@@ -18,7 +18,9 @@ if [ -n "${OLD_DOCKER_PKGS}" ]; then
   sudo apt remove -y ${OLD_DOCKER_PKGS}
 fi
 
-sudo apt install -y ca-certificates curl pass gnupg2 tmux python3 python3-pip
+sudo apt install -y \
+  ca-certificates curl pass gnupg2 tmux \
+  python3 python3-pip python3-docopt python3-requests python3-yaml
 
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -36,7 +38,7 @@ EOF
 sudo apt update -y
 
 echo "install docker-ce=${DOCKER_VERSION_STRING}"
-sudo apt install -y \
+sudo apt install -y --allow-downgrades \
   "docker-ce=${DOCKER_VERSION_STRING}" \
   "docker-ce-cli=${DOCKER_VERSION_STRING}" \
   containerd.io \
