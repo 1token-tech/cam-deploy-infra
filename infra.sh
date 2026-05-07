@@ -1,12 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOCKER_VERSION_STRING="5:27.5.1-1~ubuntu.24.04~noble"
+LEGACY_DOCKER_PACKAGES="docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc"
+DOCKER_CE_PACKAGES="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt autoremove -y
 
-# Pin Docker to a known-good Ubuntu 24.04 build for CAM deploy/upgrade compatibility.
-DOCKER_PKG_VERSION="27.5.1-0ubuntu3~24.04.2"
-sudo apt install -y --allow-downgrades \
-  "docker.io=${DOCKER_PKG_VERSION}" \
-  pass gnupg2 docker-compose tmux python3 python3-pip
+sudo apt-mark unhold ${LEGACY_DOCKER_PACKAGES} ${DOCKER_CE_PACKAGES} 2>/dev/null || true
+
+OLD_DOCKER_PKGS="$(dpkg --get-selections \
+  ${LEGACY_DOCKER_PACKAGES} 2>/dev/null \
+  | awk '$2 != "deinstall" {print $1}')"
+if [ -n "${OLD_DOCKER_PKGS}" ]; then
+  sudo apt remove -y ${OLD_DOCKER_PKGS}
+fi
+
+sudo apt install -y ca-certificates curl pass gnupg2 tmux python3 python3-pip
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update -y
+
+echo "install docker-ce=${DOCKER_VERSION_STRING}"
+sudo apt install -y \
+  "docker-ce=${DOCKER_VERSION_STRING}" \
+  "docker-ce-cli=${DOCKER_VERSION_STRING}" \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
+# Keep legacy docker-compose command working for existing camdeploy scripts.
+sudo tee /usr/local/bin/docker-compose >/dev/null <<'EOF'
+#!/usr/bin/env bash
+exec docker compose "$@"
+EOF
+sudo chmod +x /usr/local/bin/docker-compose
 
 # update memory dirty page bytes, avoid dirty page write back storm
 sudo tee /etc/sysctl.d/99-oom-tuning.conf >/dev/null <<'EOF'
@@ -50,4 +92,4 @@ sudo systemctl enable --now docker
 sudo systemctl restart docker
 
 echo 'mark docker service not auto-upgrade'
-sudo apt-mark hold docker.io
+sudo apt-mark hold ${DOCKER_CE_PACKAGES}
