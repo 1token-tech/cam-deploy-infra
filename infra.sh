@@ -1,10 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt autoremove -y
 
 # Pin Docker to a known-good Ubuntu 24.04 build for CAM deploy/upgrade compatibility.
-DOCKER_PKG_VERSION="27.5.1-0ubuntu3~24.04.2"
+# Use Ubuntu snapshot service so the exact version remains installable after the
+# regular apt indexes move on to newer builds.
+ARCH="$(dpkg --print-architecture)"
+case "${ARCH}" in
+  amd64)
+    DOCKER_PKG_VERSION="27.5.1-0ubuntu3~24.04.2"
+    DOCKER_SNAPSHOT_ID="20250801T111111Z"
+    ;;
+  arm64)
+    DOCKER_PKG_VERSION="24.0.7-0ubuntu4"
+    DOCKER_SNAPSHOT_ID="20240501T120000Z"
+    ;;
+  *)
+    echo "unsupported architecture for pinned docker.io: ${ARCH}" >&2
+    exit 1
+    ;;
+esac
+
+echo "install docker.io=${DOCKER_PKG_VERSION} for ${ARCH} from snapshot ${DOCKER_SNAPSHOT_ID}"
 sudo apt install -y --allow-downgrades \
+  --update \
+  --snapshot "${DOCKER_SNAPSHOT_ID}" \
   "docker.io=${DOCKER_PKG_VERSION}" \
   pass gnupg2 docker-compose tmux python3 python3-pip
 
