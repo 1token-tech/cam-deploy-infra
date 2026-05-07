@@ -2,14 +2,18 @@
 set -euo pipefail
 
 DOCKER_VERSION_STRING="5:27.5.1-1~ubuntu.24.04~noble"
+LEGACY_DOCKER_PACKAGES="docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc"
+DOCKER_CE_PACKAGES="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt autoremove -y
 
+sudo apt-mark unhold ${LEGACY_DOCKER_PACKAGES} ${DOCKER_CE_PACKAGES} 2>/dev/null || true
+
 OLD_DOCKER_PKGS="$(dpkg --get-selections \
-  docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null \
-  | awk '{print $1}')"
+  ${LEGACY_DOCKER_PACKAGES} 2>/dev/null \
+  | awk '$2 != "deinstall" {print $1}')"
 if [ -n "${OLD_DOCKER_PKGS}" ]; then
   sudo apt remove -y ${OLD_DOCKER_PKGS}
 fi
@@ -88,4 +92,4 @@ sudo systemctl enable --now docker
 sudo systemctl restart docker
 
 echo 'mark docker service not auto-upgrade'
-sudo apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-mark hold ${DOCKER_CE_PACKAGES}
