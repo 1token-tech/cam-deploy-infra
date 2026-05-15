@@ -4,7 +4,7 @@
 # if either failed.
 set -uo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 lint_rc=0
 bats_rc=0

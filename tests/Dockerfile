@@ -5,9 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         bats \
         shellcheck \
-        jq \
         curl \
         openssh-client \
+        python3 \
         util-linux \
         lsb-release \
         procps \

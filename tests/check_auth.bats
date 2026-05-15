@@ -4,10 +4,6 @@
 # (see tests/Dockerfile). Each test starts from a clean mocked $PATH and
 # fake $HOME so check_auth.sh's external dependencies are deterministic.
 #
-# Some tests are expected to fail against the current check_auth.sh: the
-# `set -e` + `cmd; if [ $? -eq 0 ]` pattern at lines 56-61 and 85-90 makes
-# the failure branches dead code. Treat those reds as signal, not noise.
-
 load helpers
 
 setup() {
@@ -94,6 +90,27 @@ setup() {
     [[ "$output" == *"WARNING: No data disk found"* ]]
 }
 
+@test "data disk: does not treat substring matches as /data" {
+    mock_cmd lsblk 'echo "sda 8:0 100G /metadata"'
+    run run_check_auth
+    [[ "$output" == *"WARNING: No data disk found"* ]]
+}
+
+# ---------- docker camauth container ----------
+
+@test "docker: warns when docker is up but camauth container is absent" {
+    mock_cmd docker 'exit 0'
+    run run_check_auth
+    [[ "$output" == *"WARNING: camauth container not found"* ]]
+}
+
+@test "docker: prints camauth container details when present" {
+    mock_cmd docker 'echo "camauth\tUp 3 hours"'
+    run run_check_auth
+    [[ "$output" == *"camauth"* ]]
+    [[ "$output" != *"WARNING: camauth container not found"* ]]
+}
+
 # ---------- docker daemon log rotation ----------
 
 @test "log rotation: missing daemon.json -> ERROR" {
@@ -121,6 +138,23 @@ EOF
     [[ "$output" == *"WARNING: No global log size limit"* ]]
 }
 
+@test "log rotation: unrelated strings do not count as log rotation settings" {
+    cat > /etc/docker/daemon.json <<'EOF'
+{ "note": "max-size max-file" }
+EOF
+    run run_check_auth
+    [[ "$output" == *"WARNING: No global log size limit"* ]]
+}
+
+@test "log rotation: validates daemon.json via python3 JSON parsing" {
+    cat > /etc/docker/daemon.json <<'EOF'
+{ "log-opts": { "max-size": "500m", "max-file": "5", "compress": "true" } }
+EOF
+
+    run run_check_auth
+    [[ "$output" == *"SUCCESS: Container log rotation is configured"* ]]
+}
+
 # ---------- SSH key ----------
 
 @test "ssh key: missing key file -> ERROR" {
@@ -143,4 +177,46 @@ EOF
     printf '%s' "wrongpass" > "$HOME/.camauth/id_rsa_pass"
     run run_check_auth
     [[ "$output" == *"ERROR: Invalid passphrase"* ]]
+}
+
+@test "ssh key: invalid passphrase error is printed in red" {
+    local key="$HOME/.camauth/id_rsa"
+    local red=$'\033[31m'
+    local reset=$'\033[0m'
+
+    generate_ssh_key "$key" "secret123"
+    printf '%s' "wrongpass" > "$HOME/.camauth/id_rsa_pass"
+
+    run run_check_auth
+    [[ "$output" == *"${red}ERROR: Invalid passphrase for CAM-AUTH SSH key${reset}"* ]]
+}
+
+@test "ssh key: does not pass passphrase on command line" {
+    local key="$HOME/.camauth/id_rsa"
+    printf '%s\n' "dummy private key" > "$key"
+    printf '%s' "secret123" > "$HOME/.camauth/id_rsa_pass"
+
+    mock_cmd ssh-keygen "$(cat <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+case " $* " in
+  *" -P "*|*" secret123 "*)
+    exit 99
+    ;;
+esac
+
+if [ -z "${SSH_ASKPASS:-}" ]; then
+    exit 98
+fi
+
+passphrase="$("$SSH_ASKPASS")"
+[ "$passphrase" = "secret123" ] || exit 97
+exit 0
+EOF
+)"
+
+    run run_check_auth
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == *"SUCCESS: CAM-AUTH SSH key validated"* ]]
 }
