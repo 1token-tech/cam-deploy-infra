@@ -2,7 +2,7 @@
 # Run shellcheck across check_auth.sh and the helper scripts in tests/.
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 shellcheck check_auth.sh
 shellcheck tests/run.sh tests/lint.sh tests/run-in-docker.sh

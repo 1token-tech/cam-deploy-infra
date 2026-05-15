@@ -3,7 +3,7 @@
 # Usage: bash tests/run-in-docker.sh
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 IMAGE=${IMAGE:-cam-check-auth-tests:latest}
 
