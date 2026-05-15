@@ -9,7 +9,7 @@ container.
 bash tests/run-in-docker.sh
 ```
 
-This builds an Ubuntu 24.04 image with `shellcheck`, `bats`, `jq`,
+This builds an Ubuntu 24.04 image with `shellcheck`, `bats`, `python3`,
 `openssh-client`, etc., then runs `tests/run.sh` inside it.
 
 `tests/run.sh` does two things:
@@ -43,6 +43,6 @@ The suite exercises the regressions that matter most for
 - exact `/data` mount detection instead of broad substring matching
 - exact `camauth` container presence checks instead of trusting
   `docker ps` exit status alone
-- structured `jq -e` validation for `daemon.json`
+- structured python JSON validation for `daemon.json`
 - SSH passphrase validation without exposing the passphrase in process
   arguments

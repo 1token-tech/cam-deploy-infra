@@ -25,17 +25,6 @@ EOF
 docker_log_limit_configured() {
     local docker_conf="$1"
 
-    if command -v jq >/dev/null 2>&1; then
-        jq_rc=0
-        jq -e '.["log-opts"]?["max-size"] and .["log-opts"]?["max-file"]' "$docker_conf" >/dev/null 2>&1 || jq_rc=$?
-        if [ "$jq_rc" -eq 0 ]; then
-            return 0
-        fi
-        if [ "$jq_rc" -ne 127 ]; then
-            return 1
-        fi
-    fi
-
     if command -v python3 >/dev/null 2>&1; then
         python3 - "$docker_conf" >/dev/null 2>&1 <<'EOF'
 import json
@@ -111,11 +100,7 @@ if [ ! -f "$DOCKER_CONF" ]; then
     print_error "ERROR: Docker daemon config file $DOCKER_CONF not found"
 else
     echo "INFO: Found Docker config: $DOCKER_CONF"
-    if command -v jq >/dev/null 2>&1; then
-        jq . "$DOCKER_CONF" 2>/dev/null || cat "$DOCKER_CONF"
-    else
-        cat "$DOCKER_CONF"
-    fi
+    cat "$DOCKER_CONF"
 
     # Check log size limit using structured JSON keys rather than string matching.
     if docker_log_limit_configured "$DOCKER_CONF"; then

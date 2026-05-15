@@ -146,21 +146,10 @@ EOF
     [[ "$output" == *"WARNING: No global log size limit"* ]]
 }
 
-@test "log rotation: falls back to python3 when jq is unavailable" {
+@test "log rotation: validates daemon.json via python3 JSON parsing" {
     cat > /etc/docker/daemon.json <<'EOF'
 { "log-opts": { "max-size": "500m", "max-file": "5", "compress": "true" } }
 EOF
-
-    mock_cmd jq 'exit 127'
-    mock_cmd python3 "$(cat <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-input_file="${@: -1}"
-grep -q '"max-size"' "$input_file"
-grep -q '"max-file"' "$input_file"
-EOF
-)"
 
     run run_check_auth
     [[ "$output" == *"SUCCESS: Container log rotation is configured"* ]]
