@@ -81,7 +81,7 @@ echo "------------------------------------------------"
 
 # 6. Check Docker camauth container
 echo "[6] Docker camauth Container Status"
-if CAMAUTH_CONTAINER=$(docker ps --filter 'name=^/camauth$' --format '{{.Names}}\t{{.Status}}' 2>/dev/null); then
+if CAMAUTH_CONTAINER=$(docker ps --filter 'name=^/camauth' --format '{{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null); then
     if [ -n "$CAMAUTH_CONTAINER" ]; then
         echo "$CAMAUTH_CONTAINER"
     else
